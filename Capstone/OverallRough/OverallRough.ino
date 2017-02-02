@@ -15,29 +15,19 @@ Adafruit_BNO055 bno = Adafruit_BNO055();
 #include <Adafruit_ST7735.h> // Hardware-specific library
 #include <SPI.h>
 
-// For the breakout, you can use any 2 or 3 pins
-// These pins will also work for the 1.8" TFT shield
 #define TFT_CS     10
-#define TFT_RST    9  // you can also connect this to the Arduino reset
+#define TFT_RST    9
+// you can also connect this to the Arduino reset
 // in which case, set this #define pin to 0!
 #define TFT_DC     6
-
-// Option 1 (recommended): must use the hardware SPI pins
-// (for UNO thats sclk = 13 and sid = 11) and pin 10 must be
-// an output. This is much faster - also required if you want
-// to use the microSD card (see the image drawing example)
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
 
 // Option 2: use any pins but a little slower!
 #define TFT_SCLK 13   // set these to be whatever pins you like!
 #define TFT_MOSI 11   // set these to be whatever pins you like!
-//Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
-
-
 float p = 3.1415926;
-////////////////////Definitions for MAX30100///////////////////////////////////////////
+////////////////////Definitions for MAX30100////////////////////////
 ////////////////////////////////////////////////////////////////////
-//
 #include <Wire.h>
 #include "MAX30100_PulseOximeter.h"
 
@@ -46,7 +36,7 @@ PulseOximeter pox;
 
 uint32_t tsLastReport = 0;
 
-///////////////Definitions for Temp sense//////////////////////////////
+///////////////Definitions for Temp sense//////////////////////
 ///////////////////////////////////////////////////////////////
 
 int val;
@@ -115,123 +105,138 @@ void testdrawtext(char *text, uint16_t color) {
   tft.print(text);
 }
 
-void loop() {
-  // Heart Rate Print
-  // Make sure to call update as fast as possible
+void TempSense_Calc_Print()
+{
+  //Calculation
+  int sensorValue = analogRead(tempPin);
+  float mvolts = (sensorValue * (5.0 / 1023.0)) * 1000;
+  float Temp_cel = (10.888 - sqrt((-10.888) * (-10.888) + 4 * 0.00347 * (1777.3 - mvolts))) / (2 * (-0.00347)) + 30;
+  float Temp_farh = Temp_cel * (9 / 5) + 32;
+  //Serial Print
+  Serial.print(" TEMPRATURE = ");
+  Serial.print(Temp_cel);
+  Serial.print("*C / ");
+  Serial.print(Temp_farh);
+  Serial.println("*F");
+  //TFT Print
+  tft.setTextColor(ST7735_WHITE);
+  tft.print("Body Temp: ");
+  tft.setTextColor(ST7735_RED);
+  tft.print(Temp_cel);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(" C / ");
+  tft.setTextColor(ST7735_RED);
+  tft.print(Temp_farh);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(" F");
+}
+
+void HR_SPO2_Calc_Print()
+{
   pox.update();
+  /////////////////////////////////Heart Rate/////////////////////////////////
+  //TFT
+  tft.setTextColor(ST7735_WHITE); //Maybe able to combine these two lines
+  tft.print("Heart rate: ");
+  tft.setTextColor(ST7735_RED);
+  tft.print(pox.getHeartRate(), 2);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(" bpm");
+  //Serial
+  Serial.print("Heart rate:");
+  Serial.print(pox.getHeartRate());
+  Serial.print("bpm");
+  /////////////////////////////////Blood Oxidation/////////////////////////////////
+  //TFT
+  tft.print(" / SpO2: ");
+  tft.setTextColor(ST7735_RED);
+  tft.print(pox.getSpO2());
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(" %");
+  //Serial
+  Serial.print(" SpO2:");
+  Serial.print(pox.getSpO2());
+  Serial.print("%");
+  /////////////////////////////////Temperature/////////////////////////////////
+  //TFT
+  tft.print("Temperature: ");
+  tft.setTextColor(ST7735_RED);
+  tft.print(pox.getTemperature(), 2);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(" C");
+  //Serial
+  Serial.print(" / temp:");
+  Serial.print(pox.getTemperature());
+  Serial.println("C");
+}
+
+void IMU_Calc_Print()
+{
+  //IMU
+  // Possible vector values can be:
+  // - VECTOR_ACCELEROMETER - m/s^2
+  // - VECTOR_MAGNETOMETER  - uT
+  // - VECTOR_GYROSCOPE     - rad/s
+  // - VECTOR_EULER         - degrees
+  // - VECTOR_LINEARACCEL   - m/s^2
+  // - VECTOR_GRAVITY       - m/s^2
+  imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+
+  /* Display the floating point data */
+  Serial.print("X: ");
+  Serial.print(euler.x());
+  Serial.print(" Y: ");
+  Serial.print(euler.y());
+  Serial.print(" Z: ");
+  Serial.print(euler.z());
+  Serial.print("\t\t");
+
+  /*
+    // Quaternion data
+    imu::Quaternion quat = bno.getQuat();
+    Serial.print("qW: ");
+    Serial.print(quat.w(), 4);
+    Serial.print(" qX: ");
+    Serial.print(quat.y(), 4);
+    Serial.print(" qY: ");
+    Serial.print(quat.x(), 4);
+    Serial.print(" qZ: ");
+    Serial.print(quat.z(), 4);
+    Serial.print("\t\t");
+  */
+
+  /* Display calibration status for each sensor. */
+  uint8_t system, gyro, accel, mag = 0;
+  bno.getCalibration(&system, &gyro, &accel, &mag);
+  Serial.print("CALIBRATION: Sys=");
+  Serial.print(system, DEC);
+  Serial.print(" Gyro=");
+  Serial.print(gyro, DEC);
+  Serial.print(" Accel=");
+  Serial.print(accel, DEC);
+  Serial.print(" Mag=");
+  Serial.println(mag, DEC);
+
+  delay(BNO055_SAMPLERATE_DELAY_MS);
+}
+void loop() {
+
   static char outstr[15];
   // Asynchronously dump heart rate and oxidation levels to the serial
   // For both, a value of 0 means "invalid"
   if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
+    //TFT Setup
     tft.setTextWrap(false);
     tft.fillScreen(ST7735_BLACK);
     tft.setCursor(0, 0);
     tft.setTextSize(0.1);
-
-    //Print Heart Rate
-    tft.setTextColor(ST7735_WHITE);
-    tft.print("Heart rate: ");
-    Serial.print("Heart rate:");
-    tft.setTextColor(ST7735_RED);
-    tft.print(pox.getHeartRate(), 2);
-    Serial.print(pox.getHeartRate());
-    //Print Heart Rate Unit
-    tft.setTextColor(ST7735_WHITE);
-    tft.println(" bpm");
-
-    //Print Blood Oxidation
-    tft.print("SpO2: ");
-    Serial.print("bpm / SpO2:");
-    tft.setTextColor(ST7735_RED);
-    tft.print(pox.getSpO2());
-    Serial.print(pox.getSpO2());
-    //Print SpO2 Unit
-    tft.setTextColor(ST7735_WHITE);
-    tft.println(" %");
-
-    //Print Temp
-    tft.print("Temperature: ");
-    Serial.print("% / temp:");
-    tft.setTextColor(ST7735_RED);
-    tft.print(pox.getTemperature(), 2);
-    Serial.print(pox.getTemperature());
-    //Print Temp Unit
-    tft.setTextColor(ST7735_WHITE);
-    tft.println(" C");
-    Serial.println("C");
-
-
-    //Temp Sense Voltage to Temp conversion
-    //
-    //Temp Sensing IC
-    int sensorValue = analogRead(tempPin);
-    float mvolts = (sensorValue * (5.0 / 1023.0)) * 1000;
-    float Temp_cel = (10.888 - sqrt((-10.888) * (-10.888) + 4 * 0.00347 * (1777.3 - mvolts))) / (2 * (-0.00347)) + 30;
-    float Temp_farh = Temp_cel * (9 / 5) + 32;
-    Serial.print(" TEMPRATURE = ");
-    Serial.print(Temp_cel);
-    Serial.print("*C / ");
-    Serial.print(Temp_farh);
-    Serial.println("*F");
-    tft.setTextColor(ST7735_WHITE);
-    tft.print("Body Temp: ");
-    tft.setTextColor(ST7735_RED);
-    tft.print(Temp_cel);
-    tft.setTextColor(ST7735_WHITE);
-    tft.println(" C / ");
-    tft.setTextColor(ST7735_RED);
-    tft.print(Temp_farh);
-    tft.setTextColor(ST7735_WHITE);
-    tft.println(" F");
-    delay(1000);
+    //Heart Rate and Blood Oxidation
+    HR_SPO2_Calc_Print();
+    //Temperature Sensing IC
+    TempSense_Calc_Print();
+    //Inertial Measurement Unit
+    IMU_Calc_Print();
     
-    //IMU
-    // Possible vector values can be:
-    // - VECTOR_ACCELEROMETER - m/s^2
-    // - VECTOR_MAGNETOMETER  - uT
-    // - VECTOR_GYROSCOPE     - rad/s
-    // - VECTOR_EULER         - degrees
-    // - VECTOR_LINEARACCEL   - m/s^2
-    // - VECTOR_GRAVITY       - m/s^2
-    imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
-
-    /* Display the floating point data */
-    Serial.print("X: ");
-    Serial.print(euler.x());
-    Serial.print(" Y: ");
-    Serial.print(euler.y());
-    Serial.print(" Z: ");
-    Serial.print(euler.z());
-    Serial.print("\t\t");
-
-    /*
-      // Quaternion data
-      imu::Quaternion quat = bno.getQuat();
-      Serial.print("qW: ");
-      Serial.print(quat.w(), 4);
-      Serial.print(" qX: ");
-      Serial.print(quat.y(), 4);
-      Serial.print(" qY: ");
-      Serial.print(quat.x(), 4);
-      Serial.print(" qZ: ");
-      Serial.print(quat.z(), 4);
-      Serial.print("\t\t");
-    */
-
-    /* Display calibration status for each sensor. */
-    uint8_t system, gyro, accel, mag = 0;
-    bno.getCalibration(&system, &gyro, &accel, &mag);
-    Serial.print("CALIBRATION: Sys=");
-    Serial.print(system, DEC);
-    Serial.print(" Gyro=");
-    Serial.print(gyro, DEC);
-    Serial.print(" Accel=");
-    Serial.print(accel, DEC);
-    Serial.print(" Mag=");
-    Serial.println(mag, DEC);
-
-    delay(BNO055_SAMPLERATE_DELAY_MS);
     tsLastReport = millis();
-
   }
 }
