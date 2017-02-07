@@ -35,12 +35,40 @@ float p = 3.1415926;
 PulseOximeter pox;
 
 uint32_t tsLastReport = 0;
+///////////////Definitions for BLE//////////////////////////////
+///////////////////////////////////////////////////////////////
+#include <Arduino.h>
+#if not defined (_VARIANT_ARDUINO_DUE_X_) && not defined (_VARIANT_ARDUINO_ZERO_)
+#include <SoftwareSerial.h>
+#endif
+
+#include "Adafruit_BLE.h"
+#include "Adafruit_BluefruitLE_SPI.h"
+#include "Adafruit_BluefruitLE_UART.h"
+
+#include "BluefruitConfig.h"
+#define button 5
+
+#define FACTORYRESET_ENABLE         1
+#define MINIMUM_FIRMWARE_VERSION    "0.6.6"
+#define MODE_LED_BEHAVIOUR          "MODE"
+
+Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
+
+
 
 ///////////////Definitions for Temp sense//////////////////////
 ///////////////////////////////////////////////////////////////
 
 int val;
 int tempPin = 1;
+
+//BLE Error Function
+void error(const __FlashStringHelper*err)
+{
+  Serial.println(err);
+  while (1);
+}
 
 // Callback (registered below) fired when a pulse is detected
 void onBeatDetected()
@@ -83,7 +111,7 @@ void setup() {
   Serial.println("Initialized");
 
   uint16_t time = millis();
-  tft.fillScreen(ST7735_BLACK);
+  //tft.fillScreen(ST7735_BLACK);
   time = millis() - time;
 
   Serial.println(time, DEC);
@@ -96,13 +124,94 @@ void setup() {
   // Initialize the PulseOximeter instance and register a beat-detected callback
   pox.begin();
   pox.setOnBeatDetectedCallback(onBeatDetected);
+  ble_init();
 
+}
+//Initiate BLE
+void ble_init() {
+  if ( !ble.begin(VERBOSE_MODE) )
+  {
+    error(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
+  }
+  Serial.println( F("OK!") );
+
+  if ( FACTORYRESET_ENABLE )
+  {
+    /* Perform a factory reset to make sure everything is in a known state */
+    Serial.println(F("Performing a factory reset: "));
+    if ( ! ble.factoryReset() ) {
+      error(F("Couldn't factory reset"));
+    }
+  }
+
+  /* Disable command echo from Bluefruit */
+  ble.echo(false);
+
+  Serial.println("Requesting Bluefruit info:");
+  /* Print Bluefruit information */
+  ble.info();
+
+  Serial.println(F("Please use Adafruit Bluefruit LE app to connect in UART mode"));
+  Serial.println(F("Then Enter characters to send to Bluefruit"));
+  Serial.println();
+
+  ble.verbose(false);  // debug info is a little annoying after this point!
+
+  /* Wait for connection */
+  while (! ble.isConnected()) {
+    delay(500);
+  }
+
+  Serial.println(F("******************************"));
+
+  // LED Activity command is only supported from 0.6.6
+  if ( ble.isVersionAtLeast(MINIMUM_FIRMWARE_VERSION) )
+  {
+    // Change Mode LED Activity
+    Serial.println(F("Change LED activity to " MODE_LED_BEHAVIOUR));
+    ble.sendCommandCheckOK("AT+HWModeLED=" MODE_LED_BEHAVIOUR);
+  }
+
+  // Set module to DATA mode
+  Serial.println( F("Switching to DATA mode!") );
+  ble.setMode(BLUEFRUIT_MODE_DATA);
+
+  Serial.println(F("******************************"));
 }
 void testdrawtext(char *text, uint16_t color) {
   tft.setCursor(0, 0);
   tft.setTextColor(color);
   tft.setTextWrap(true);
   tft.print(text);
+}
+void ble_sending_phone(){
+  if (Serial.available())
+  {
+    char n, inputs[BUFSIZE + 1];
+    n = Serial.readBytes(inputs, BUFSIZE);
+    inputs[n] = 0;
+    // Send characters to Bluefruit
+    Serial.print("Sending: ");
+    Serial.println(inputs);
+
+    // Send input data to host via Bluefruit
+    ble.print(inputs);
+
+  }
+
+  // Echo received data
+  while ( ble.available() )
+  {
+    int c = ble.read();
+
+    Serial.print((char)c);
+
+    // Hex output too, helps w/debugging!
+    Serial.print(" [0x");
+    if (c <= 0xF) Serial.print(F("0"));
+    Serial.print(c, HEX);
+    Serial.print("] ");
+  }
 }
 
 void TempSense_Calc_Print()
@@ -129,6 +238,12 @@ void TempSense_Calc_Print()
   tft.print(Temp_farh);
   tft.setTextColor(ST7735_WHITE);
   tft.println(" F");
+  //print BLE
+  ble.print(" TEMPRATURE = ");
+  ble.print(Temp_cel);
+  ble.print("*C / ");
+  ble.print(Temp_farh);
+  ble.println("*F");
 }
 
 void HR_SPO2_Calc_Print()
@@ -146,6 +261,10 @@ void HR_SPO2_Calc_Print()
   Serial.print("Heart rate:");
   Serial.print(pox.getHeartRate());
   Serial.print("bpm");
+  //BLE
+  ble.print("Heart rate:");
+  ble.print(pox.getHeartRate());
+  ble.print("bpm");
   /////////////////////////////////Blood Oxidation/////////////////////////////////
   //TFT
   tft.print(" / SpO2: ");
@@ -157,6 +276,10 @@ void HR_SPO2_Calc_Print()
   Serial.print(" SpO2:");
   Serial.print(pox.getSpO2());
   Serial.print("%");
+  //BLE
+  ble.print(" SpO2:");
+  ble.print(pox.getSpO2());
+  ble.print("%");
   /////////////////////////////////Temperature/////////////////////////////////
   //TFT
   tft.print("Temperature: ");
@@ -168,6 +291,10 @@ void HR_SPO2_Calc_Print()
   Serial.print(" / temp:");
   Serial.print(pox.getTemperature());
   Serial.println("C");
+  //BLE
+  ble.print(" / temp:");
+  ble.print(pox.getTemperature());
+  ble.println("C");
 }
 
 void IMU_Calc_Print()
@@ -190,6 +317,14 @@ void IMU_Calc_Print()
   Serial.print(" Z: ");
   Serial.print(euler.z());
   Serial.print("\t\t");
+  //BLE
+  ble.print("X: ");
+  ble.print(euler.x());
+  ble.print(" Y: ");
+  ble.print(euler.y());
+  ble.print(" Z: ");
+  ble.print(euler.z());
+  ble.print("\t\t");
 
   /*
     // Quaternion data
@@ -216,6 +351,15 @@ void IMU_Calc_Print()
   Serial.print(accel, DEC);
   Serial.print(" Mag=");
   Serial.println(mag, DEC);
+  //BLE
+  ble.print("CALIBRATION: Sys=");
+  ble.print(system, DEC);
+  ble.print(" Gyro=");
+  ble.print(gyro, DEC);
+  ble.print(" Accel=");
+  ble.print(accel, DEC);
+  ble.print(" Mag=");
+  ble.println(mag, DEC);
 
   delay(BNO055_SAMPLERATE_DELAY_MS);
 }
@@ -236,7 +380,10 @@ void loop() {
     TempSense_Calc_Print();
     //Inertial Measurement Unit
     IMU_Calc_Print();
-    
+
+    //BLE Send
+    ble_sending_phone();
+
     tsLastReport = millis();
   }
 }
