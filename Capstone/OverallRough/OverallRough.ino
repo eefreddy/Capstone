@@ -1,74 +1,7 @@
-///////////////Definitions for IMU//////////////////////////////
-///////////////////////////////////////////////////////////////
-#include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BNO055.h>
-#include <utility/imumaths.h>
-
-/* Set the delay between fresh samples */
-#define BNO055_SAMPLERATE_DELAY_MS (100)
-
-Adafruit_BNO055 bno = Adafruit_BNO055();
-///////////////Definitions for LCD//////////////////////////////
-///////////////////////////////////////////////////////////////
-#include <Adafruit_GFX.h>    // Core graphics library
-#include <Adafruit_ST7735.h> // Hardware-specific library
-#include <SPI.h>
-
-#define TFT_CS     10
-#define TFT_RST    9
-// you can also connect this to the Arduino reset
-// in which case, set this #define pin to 0!
-#define TFT_DC     6
-Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
-
-// Option 2: use any pins but a little slower!
-#define TFT_SCLK 13   // set these to be whatever pins you like!
-#define TFT_MOSI 11   // set these to be whatever pins you like!
-float p = 3.1415926;
-////////////////////Definitions for MAX30100////////////////////////
-////////////////////////////////////////////////////////////////////
-#include <Wire.h>
-#include "MAX30100_PulseOximeter.h"
-
-#define REPORTING_PERIOD_MS     1000
-PulseOximeter pox;
-
-uint32_t tsLastReport = 0;
-///////////////Definitions for BLE//////////////////////////////
-///////////////////////////////////////////////////////////////
-#include <Arduino.h>
-#if not defined (_VARIANT_ARDUINO_DUE_X_) && not defined (_VARIANT_ARDUINO_ZERO_)
-#include <SoftwareSerial.h>
-#endif
-
-#include "Adafruit_BLE.h"
-#include "Adafruit_BluefruitLE_SPI.h"
-#include "Adafruit_BluefruitLE_UART.h"
-
-#include "BluefruitConfig.h"
-#define button 5
-
-#define FACTORYRESET_ENABLE         1
-#define MINIMUM_FIRMWARE_VERSION    "0.6.6"
-#define MODE_LED_BEHAVIOUR          "MODE"
-
-Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
-
-
-
-///////////////Definitions for Temp sense//////////////////////
-///////////////////////////////////////////////////////////////
-
-int val;
-int tempPin = 1;
-
-//BLE Error Function
-void error(const __FlashStringHelper*err)
-{
-  Serial.println(err);
-  while (1);
-}
+#include "TempConfig.h";
+#include "IMUConfig.h";
+#include "Max30100Config.h";
+#include "BLEConfig.h";
 
 // Callback (registered below) fired when a pulse is detected
 void onBeatDetected()
@@ -202,15 +135,16 @@ void ble_sending_phone(){
   // Echo received data
   while ( ble.available() )
   {
-    int c = ble.read();
+    char c= ble.read();
 
-    Serial.print((char)c);
+    Serial.print(c);
 
     // Hex output too, helps w/debugging!
-    Serial.print(" [0x");
-    if (c <= 0xF) Serial.print(F("0"));
-    Serial.print(c, HEX);
-    Serial.print("] ");
+    //Serial.print(" [0x");
+    //if (c <= 0xF) Serial.print(F("0"));
+   // Serial.print(c);//, HEX);
+    //Serial.print("] ");
+    tft.print(c);
   }
 }
 
@@ -218,7 +152,8 @@ void TempSense_Calc_Print()
 {
   //Calculation
   int sensorValue = analogRead(tempPin);
-  float mvolts = (sensorValue * (5.0 / 1023.0)) * 1000;
+  float mvolts = (sensorValue * (3.3 / 1023.0)) * 1000;
+  Serial.print(mvolts);
   float Temp_cel = (10.888 - sqrt((-10.888) * (-10.888) + 4 * 0.00347 * (1777.3 - mvolts))) / (2 * (-0.00347)) + 30;
   float Temp_farh = Temp_cel * (9 / 5) + 32;
   //Serial Print
