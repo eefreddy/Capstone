@@ -1,7 +1,50 @@
 #include "TempConfig.h";
-#include "IMUConfig.h";
-#include "Max30100Config.h";
-#include "BLEConfig.h";
+///////////////Definitions for IMU//////////////////////////////
+///////////////////////////////////////////////////////////////
+
+////////////////////Definitions for MAX30100////////////////////////
+////////////////////////////////////////////////////////////////////
+#include <Wire.h>
+#include "MAX30100_PulseOximeter.h"
+
+#define REPORTING_PERIOD_MS     1000
+PulseOximeter pox;
+
+uint32_t tsLastReport = 0;
+///////////////Definitions for BLE//////////////////////////////
+///////////////////////////////////////////////////////////////
+#include <Arduino.h>
+#if not defined (_VARIANT_ARDUINO_DUE_X_) && not defined (_VARIANT_ARDUINO_ZERO_)
+#include <SoftwareSerial.h>
+#endif
+
+#include "Adafruit_BLE.h"
+#include "Adafruit_BluefruitLE_SPI.h"
+#include "Adafruit_BluefruitLE_UART.h"
+
+#include "BluefruitConfig.h"
+#define button 5
+
+#define FACTORYRESET_ENABLE         1
+#define MINIMUM_FIRMWARE_VERSION    "0.6.6"
+#define MODE_LED_BEHAVIOUR          "MODE"
+
+Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
+
+
+
+///////////////Definitions for Temp sense//////////////////////
+///////////////////////////////////////////////////////////////
+
+//int val;
+//int tempPin = 1;
+
+//BLE Error Function
+void error(const __FlashStringHelper*err)
+{
+  Serial.println(err);
+  while (1);
+}
 
 // Callback (registered below) fired when a pulse is detected
 void onBeatDetected()
@@ -34,6 +77,9 @@ void setup() {
   bno.setExtCrystalUse(true);
 
   Serial.println("Calibration status values: 0=uncalibrated, 3=fully calibrated");
+  // LCD
+
+  Serial.print("Hello! ST7735 TFT Test");
 
   // Use this initializer (uncomment) if you're using a 1.44" TFT
   tft.initR(INITR_144GREENTAB);   // initialize a ST7735S chip, black tab
@@ -41,10 +87,14 @@ void setup() {
   Serial.println("Initialized");
 
   uint16_t time = millis();
+  //tft.fillScreen(ST7735_BLACK);
   time = millis() - time;
 
   Serial.println(time, DEC);
   delay(500);
+
+  //HEart Rate
+  //Serial.begin(115200);
 
   Serial.println("Initializing MAX30100");
   // Initialize the PulseOximeter instance and register a beat-detected callback
@@ -179,7 +229,7 @@ void HR_SPO2_Calc_Print()
   pox.update();
   /////////////////////////////////Heart Rate/////////////////////////////////
   //TFT
-  tft.setTextColor(ST7735_WHITE);
+  tft.setTextColor(ST7735_WHITE); //Maybe able to combine these two lines
   tft.print("Heart rate: ");
   tft.setTextColor(ST7735_RED);
   tft.print(pox.getHeartRate(), 2);
