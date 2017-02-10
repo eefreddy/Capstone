@@ -2,7 +2,6 @@
 #include "IMUConfig.h";
 #include "Max30100Config.h";
 #include "BLEConfig.h";
-#include "TFTConfig.h";
 
 // Callback (registered below) fired when a pulse is detected
 void onBeatDetected()
@@ -19,7 +18,7 @@ void setup() {
   if (!bno.begin())
   {
     /* There was a problem detecting the BNO055 ... check your connections */
-    Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
+    tft.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
     while (1);
   }
 
@@ -50,6 +49,7 @@ void setup() {
   Serial.println("Initializing MAX30100");
   // Initialize the PulseOximeter instance and register a beat-detected callback
   pox.begin();
+  tft.print("Pox.begin");
   pox.setOnBeatDetectedCallback(onBeatDetected);
   ble_init();
 
@@ -111,7 +111,7 @@ void testdrawtext(char *text, uint16_t color) {
   tft.setTextWrap(true);
   tft.print(text);
 }
-void ble_sending_phone() {
+void ble_sending_phone(){
   if (Serial.available())
   {
     char n, inputs[BUFSIZE + 1];
@@ -129,14 +129,14 @@ void ble_sending_phone() {
   // Echo received data
   while ( ble.available() )
   {
-    char c = ble.read();
+    char c= ble.read();
 
     Serial.print(c);
 
     // Hex output too, helps w/debugging!
     //Serial.print(" [0x");
     //if (c <= 0xF) Serial.print(F("0"));
-    // Serial.print(c);//, HEX);
+   // Serial.print(c);//, HEX);
     //Serial.print("] ");
     tft.print(c);
   }
@@ -177,11 +177,7 @@ void TempSense_Calc_Print()
 
 void HR_SPO2_Calc_Print()
 {
- pox.update();
-
-  // Asynchronously dump heart rate and oxidation levels to the serial
-  // For both, a value of 0 means "invalid"
-  //    if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
+  pox.update();
   /////////////////////////////////Heart Rate/////////////////////////////////
   //TFT
   tft.setTextColor(ST7735_WHITE);
@@ -228,8 +224,6 @@ void HR_SPO2_Calc_Print()
   ble.print(" / temp:");
   ble.print(pox.getTemperature());
   ble.println("C");
-  //        tsLastReport = millis();
-  //    }
 }
 
 void IMU_Calc_Print()
@@ -300,28 +294,25 @@ void IMU_Calc_Print()
 }
 void loop() {
 
-
   static char outstr[15];
   // Asynchronously dump heart rate and oxidation levels to the serial
   // For both, a value of 0 means "invalid"
-  pox.update();
-  //TFT Setup
-  tft.setTextWrap(false);
-  tft.fillScreen(ST7735_BLACK);
-  tft.setCursor(0, 0);
-  tft.setTextSize(0.1);
-  
   if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
+    //TFT Setup
+    tft.setTextWrap(false);
+    tft.fillScreen(ST7735_BLACK);
+    tft.setCursor(0, 0);
+    tft.setTextSize(0.1);
     //Heart Rate and Blood Oxidation
     HR_SPO2_Calc_Print();
     //Temperature Sensing IC
     TempSense_Calc_Print();
     //Inertial Measurement Unit
     IMU_Calc_Print();
+
     //BLE Send
     ble_sending_phone();
+
     tsLastReport = millis();
   }
-
-
 }
