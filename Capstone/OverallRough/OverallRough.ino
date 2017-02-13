@@ -3,6 +3,7 @@
 #include "Max30100Config.h";
 #include "BLEConfig.h";
 #include "TFTConfig.h";
+#include "stdio.h";
 
 // Callback (registered below) fired when a pulse is detected
 void onBeatDetected()
@@ -86,8 +87,15 @@ void ble_init() {
 
   /* Wait for connection */
   while (! ble.isConnected()) {
-    delay(500);
+    tft.fillScreen(ST7735_BLACK);
+    tft.setCursor(0, 0);
+    tft.setTextColor(ST7735_WHITE);
+    tft.println("Connect to BLE app");
+    delay(2000);
   }
+
+  tft.println("Thanks babe");
+  delay(3000);
 
   Serial.println(F("******************************"));
 
